@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+PRG=$0
+CMD="$1"
+
+function usage() {
+    echo "Usage: $PRG <brainfuck interpreter executable>"
+    echo "  if the interpreter is some kind of fucky-wacky thingy create an executable script to start it."
+    echo "  this script should pass as the 1st argument to $0."
+    echo "  it should also accept a file (BrainFuck source) as argument."
+    exit 1
+}
+
+
+function fatal() {
+    echo "$1"
+    exit 1
+}
+
+function get-input-file() {
+    test_file=$1
+    file_path=$(dirname $test_file)
+    file_name=$(basename $test_file)
+    regex='(.+)\-(.+\.input)\.bf'
+    if [[ $file_name =~ $regex ]]; then
+        # has input
+        echo "$file_path/${BASH_REMATCH[2]}"
+    fi
+}
+
+
+if [[ "$CMD" == "" ]]; then
+    usage
+fi
+
+if [ -x "$CMD" ]; then
+    echo "✅ $CMD is executable."
+else
+    fatal "❌ $CMD is NO executable."
+fi
+
+ok_passed=0
+ko_passed=0
+total=0
+
+for test_file in ./tests/*.bf; do
+    (( total ++ ))
+    input_file=$(get-input-file $test_file)
+    if [[ $input_file == "" ]]; then
+        "$CMD" $test_file > result.raw
+    else
+        echo "🤔 Input file: $input_file"
+        cat "$input_file" | "$CMD" $test_file > result.raw
+    fi
+
+    $test_file result.raw
+    if [[ $? == 0 ]]; then
+        echo "✅ $test_file PASSED"
+        (( ok_passed++ ))
+    else
+        echo "❌ $test_file FAILED"
+        (( ko_passed++ ))
+    fi
+    if [[ -f result.raw ]]; then
+        rm result.raw
+    fi
+done
+
+echo "------------------------------------------------"
+if (( total == ok_passed )); then
+    echo "✅ All tests passed! ($ok_passed / $total)"
+elif (( total == ko_passed )); then
+    fatal "❌ All tests FAILED! $total of them. Something is ill configured."
+else
+    fatal "❌ Some tests FAILED! ($ko_passed / $total). Check your code."
+fi
